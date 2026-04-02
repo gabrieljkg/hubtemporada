@@ -13,8 +13,9 @@ export const Home = () => {
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get('q')?.toLowerCase() || '';
+  const modeParam = searchParams.get('mode');
   const { isAdmin } = useAdmin();
 
   // Sales filters
@@ -22,7 +23,15 @@ export const Home = () => {
   const [bairroFilter, setBairroFilter] = useState('');
   const [quartosFilter, setQuartosFilter] = useState('');
   const [valorMaxFilter, setValorMaxFilter] = useState('');
-  const [isSalesMode, setIsSalesMode] = useState(false);
+  const [isSalesMode, setIsSalesMode] = useState(modeParam === 'venda');
+
+  useEffect(() => {
+    if (modeParam === 'venda') {
+      setIsSalesMode(true);
+    } else if (modeParam === 'aluguel') {
+      setIsSalesMode(false);
+    }
+  }, [modeParam]);
 
   const filteredDestinations = destinations.filter(dest => {
     if (isSalesMode) {
