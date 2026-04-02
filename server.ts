@@ -60,6 +60,8 @@ app.post("/api/webhook/stripe", express.raw({ type: 'application/json' }), async
   if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     const session = event.data.object as Stripe.Checkout.Session;
     const bookingId = session.metadata?.booking_id;
+    const saleId = session.metadata?.sale_id;
+    const destinationId = session.metadata?.destination_id;
     const paymentId = session.payment_intent as string;
 
     if (bookingId) {
@@ -80,6 +82,23 @@ app.post("/api/webhook/stripe", express.raw({ type: 'application/json' }), async
         console.log(`Booking ${bookingId} updated successfully for payment ${paymentId}.`);
       }
     }
+
+    if (saleId && destinationId) {
+      console.log(`Payment approved for sale ${saleId}. Updating destination ${destinationId}...`);
+
+      const { error } = await supabase
+        .from("destinations")
+        .update({
+          status_venda: "Venda em Andamento"
+        })
+        .eq("id", destinationId);
+
+      if (error) {
+        console.error("Error updating destination sale status from webhook:", error);
+      } else {
+        console.log(`Destination ${destinationId} updated successfully for sale ${saleId}.`);
+      }
+    }
   }
 
   res.send();
@@ -89,6 +108,69 @@ app.post("/api/webhook/stripe", express.raw({ type: 'application/json' }), async
 app.use(express.json());
 
 // API routes
+app.post("/api/create-sale-session", async (req, res) => {
+  try {
+    if (!stripeSecretKey) {
+      throw new Error("STRIPE_SECRET_KEY não configurado.");
+    }
+
+    const { totalAmount, paymentMethodId, payer, saleData } = req.body;
+    const appUrl = getAppUrl();
+
+    console.log(`Creating Stripe checkout session for sale, amount: ${totalAmount}, method: ${paymentMethodId}`);
+
+    // Create a unique sale ID (could be saved to a sales table, but for now we just use a timestamp or uuid)
+    const saleId = `sale_${Date.now()}`;
+
+    let paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = ['card'];
+    if (paymentMethodId === 'pix') {
+      paymentMethodTypes = ['pix'];
+    } else if (paymentMethodId === 'boleto') {
+      paymentMethodTypes = ['boleto'];
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: paymentMethodTypes,
+      line_items: [
+        {
+          price_data: {
+            currency: 'brl',
+            product_data: {
+              name: `Sinal de Compra de Imóvel - ${payer?.name || 'Comprador'}`,
+              description: `Comissão de 20% para reserva de compra do imóvel`,
+            },
+            unit_amount: Math.round(Number(totalAmount) * 100), // Stripe expects amounts in cents
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${appUrl}/sucesso?status=approved`,
+      cancel_url: `${appUrl}/sucesso?status=failure`,
+      customer_email: payer?.email || undefined,
+      metadata: {
+        sale_id: saleId,
+        destination_id: saleData.destination_id
+      },
+      payment_intent_data: {
+        metadata: {
+          sale_id: saleId,
+          destination_id: saleData.destination_id
+        }
+      }
+    });
+
+    console.log(`Stripe Sale Session created: ${session.id}, url: ${session.url}`);
+    return res.json({ 
+      id: session.id, 
+      url: session.url
+    });
+  } catch (error: any) {
+    console.error("Error creating Stripe sale session:", error);
+    res.status(500).json({ error: error.message || "Erro interno ao criar sessão de pagamento de venda" });
+  }
+});
+
 app.post("/api/create-checkout-session", async (req, res) => {
   try {
     if (!stripeSecretKey) {

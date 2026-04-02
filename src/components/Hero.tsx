@@ -25,9 +25,9 @@ export const Hero = () => {
             <span className="text-[11px] uppercase tracking-[0.4em] mb-6 block">
               O Marketplace Premium para Desconexão Radical
             </span>
-            <h1 className="text-[12vw] md:text-[8vw] leading-[0.9] font-serif font-light mb-8">
-              Onde o sinal <br />
-              <span className="italic">acaba</span>, a vida começa.
+            <h1 className="text-[8vw] md:text-[5vw] leading-[1.1] font-serif font-light mb-8">
+              Do silêncio da chácara ao conforto da cidade: <br />
+              <span className="italic text-[6vw] md:text-[4vw]">seu momento de pausa está aqui.</span>
             </h1>
             
             <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">

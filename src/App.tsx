@@ -3,7 +3,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { ListingDetail } from './pages/ListingDetail';
 import { Checkout } from './pages/Checkout';
+import { CheckoutSale } from './pages/CheckoutSale';
 import { ListProperty } from './pages/ListProperty';
+import { ListPropertySale } from './pages/ListPropertySale';
 import { Profile } from './pages/Profile';
 import { AdminReservations } from './pages/AdminReservations';
 import { AdminChat } from './pages/AdminChat';
@@ -21,7 +23,9 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/imovel/:id/:slug?" element={<ListingDetail />} />
           <Route path="/checkout" element={<Checkout />} />
+          <Route path="/checkout-venda" element={<CheckoutSale />} />
           <Route path="/anunciar" element={<ListProperty />} />
+          <Route path="/anunciar-venda" element={<ListPropertySale />} />
           <Route path="/perfil" element={<Profile />} />
           <Route path="/admin/reservas" element={<AdminReservations />} />
           <Route path="/admin/chat" element={<AdminChat />} />

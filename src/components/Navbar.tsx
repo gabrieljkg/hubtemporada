@@ -65,20 +65,24 @@ export const Navbar = () => {
           )}
           <div className="nav-item hidden md:flex items-center gap-2">
             <Search className="w-4 h-4" />
-            <span>Zonas Mortas</span>
+            <span>Imóveis Premium</span>
           </div>
         </div>
         
         <Link to="/" className="text-2xl font-serif tracking-widest uppercase py-4 px-8 border-x border-ink/20">
-          Unplugged Bliss
+          Hub Temporada
         </Link>
         
         <div className="flex items-center">
           <Link to="/anunciar" className="nav-item hidden lg:flex items-center gap-2 bg-ink text-paper px-4 py-2 rounded-full hover:bg-ink/80 transition-colors">
             <Plus className="w-4 h-4" />
-            <span className="font-semibold">Anunciar meu Imóvel</span>
+            <span className="font-semibold">Anunciar Aluguel</span>
           </Link>
-          <Link to="/perfil" className="nav-item hidden md:flex items-center gap-2">
+          <Link to="/anunciar-venda" className="nav-item hidden lg:flex items-center gap-2 border border-ink text-ink px-4 py-2 rounded-full hover:bg-ink/5 transition-colors ml-2">
+            <Plus className="w-4 h-4" />
+            <span className="font-semibold">Cadastrar Venda</span>
+          </Link>
+          <Link to="/perfil" className="nav-item hidden md:flex items-center gap-2 ml-4">
             {session?.user?.user_metadata?.avatar_url ? (
               <img 
                 src={session.user.user_metadata.avatar_url} 

@@ -4,7 +4,7 @@ import { Destination } from '../data/mockData';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { motion } from 'motion/react';
-import { WifiOff, ShieldCheck, Calendar as CalendarIcon, MapPin, ArrowLeft, Camera, Notebook, Map as MapIcon, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { WifiOff, ShieldCheck, Calendar as CalendarIcon, MapPin, ArrowLeft, Camera, Notebook, Map as MapIcon, Plus, Trash2, ChevronLeft, ChevronRight, X, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useCart } from '../context/CartContext';
 import { useAdmin, ADMIN_EMAIL } from '../hooks/useAdmin';
@@ -24,12 +24,6 @@ import {
   parseISO
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-const DETOX_PRODUCTS = [
-  { id: 'p1', name: 'Câmera de Filme 35mm', price: 85, icon: Camera, description: 'Capture momentos sem telas.' },
-  { id: 'p2', name: 'Caderno de Couro', price: 60, icon: Notebook, description: 'Para seus pensamentos offline.' },
-  { id: 'p3', name: 'Mapa Físico da Região', price: 40, icon: MapIcon, description: 'Navegação analógica pura.' },
-];
 
 export const ListingDetail = () => {
   const { id } = useParams();
@@ -56,25 +50,51 @@ export const ListingDetail = () => {
     const fetchDestination = async () => {
       try {
         console.log(`Buscando destino ID: ${id} no Supabase...`);
-        const { data, error } = await supabase
+        
+        // Tenta buscar na tabela destinations primeiro
+        let { data, error } = await supabase
           .from('destinations')
           .select('*')
           .eq('id', id)
           .single();
         
-        if (error) {
-          console.error('ERRO TÉCNICO SUPABASE (Detail):', {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-          });
-          throw error;
+        // Se não encontrar ou der erro, tenta na tabela imoveis
+        if (error || !data) {
+          const { data: saleData, error: saleError } = await supabase
+            .from('imoveis')
+            .select('*')
+            .eq('id', id)
+            .single();
+          
+          if (saleError) {
+            console.error('Erro ao buscar em ambas as tabelas:', saleError);
+            throw saleError;
+          }
+          data = saleData;
         }
+        
         if (data) {
-          console.log('Destino carregado com sucesso:', data.title);
+          console.log('Destino carregado com sucesso:', data.title || data.titulo);
+          
+          // Verifica se veio da tabela imoveis (campos em português)
+          const isFromImoveis = data.titulo !== undefined;
+
           // Map data to match Destination interface
-          const mappedData: Destination = {
+          const mappedData: Destination = isFromImoveis ? {
+            id: data.id,
+            title: data.titulo || 'Sem Título',
+            location: data.bairro || 'Localização não informada',
+            description: 'Imóvel disponível para venda.',
+            price: 0,
+            signalStrength: 0,
+            image: Array.isArray(data.image_url) ? (data.image_url[0] || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000') : (data.image_url || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000'),
+            images: Array.isArray(data.image_url) ? data.image_url : [data.image_url],
+            tags: [],
+            features: [],
+            valor_venda: data.valor,
+            bairro: data.bairro,
+            quantidade_quartos: data.quartos
+          } : {
             id: data.id,
             title: data.title || 'Sem Título',
             location: data.location || 'Localização não informada',
@@ -86,6 +106,7 @@ export const ListingDetail = () => {
             tags: data.tags || [],
             features: data.features || []
           };
+          
           setDestination(mappedData);
           setSelectedImage(mappedData.image);
           
@@ -112,6 +133,78 @@ export const ListingDetail = () => {
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [bookedDates, setBookedDates] = useState<{id: string, check_in: string, check_out: string}[]>([]);
   const [selectedImage, setSelectedImage] = useState<string>('');
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setIsLightboxOpen(true);
+  };
+
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (destination?.images) {
+      setLightboxIndex((prev) => (prev + 1) % destination.images!.length);
+    }
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (destination?.images) {
+      setLightboxIndex((prev) => (prev - 1 + destination.images!.length) % destination.images!.length);
+    }
+  };
+  
+  // Lead form state
+  const [leadForm, setLeadForm] = useState({ nome: '', email: '', telefone: '' });
+  const [leadLoading, setLeadLoading] = useState(false);
+  const [leadSuccess, setLeadSuccess] = useState(false);
+  const [leadError, setLeadError] = useState<string | null>(null);
+
+  const handleSubmitLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!destination) return;
+    setLeadLoading(true);
+    setLeadError(null);
+
+    try {
+      // 1. Salvar no Supabase
+      const { error: supabaseError } = await supabase
+        .from('leads_vendas')
+        .insert([{
+          nome: leadForm.nome,
+          email: leadForm.email,
+          telefone: leadForm.telefone,
+          imovel_id: String(destination.id),
+          imovel_titulo: destination.title
+        }]);
+
+      if (supabaseError) console.error('Erro Supabase Lead:', supabaseError);
+
+      // 2. Enviar Email
+      const response = await fetch("https://formsubmit.co/ajax/gabrielcalid@gmail.com", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+            _subject: `Novo Interesse (Detalhes): ${destination.title}`,
+            Imóvel: destination.title,
+            Valor: destination.valor_venda ? `R$ ${destination.valor_venda}` : 'Não informado',
+            Nome: leadForm.nome,
+            Email: leadForm.email,
+            Telefone: leadForm.telefone,
+        })
+      });
+
+      if (!response.ok) throw new Error('Falha ao enviar e-mail.');
+
+      setLeadSuccess(true);
+      setLeadForm({ nome: '', email: '', telefone: '' });
+    } catch (err: any) {
+      setLeadError(err.message || 'Erro ao enviar dados.');
+    } finally {
+      setLeadLoading(false);
+    }
+  };
 
   const isDateReserved = (date: Date) => {
     return bookedDates.some(period => {
@@ -354,13 +447,22 @@ export const ListingDetail = () => {
             animate={{ opacity: 1, x: 0 }}
             className="space-y-8"
           >
-            <div className="relative aspect-[4/5] overflow-hidden">
+            <div 
+              className="relative aspect-[4/5] overflow-hidden cursor-zoom-in group"
+              onClick={() => {
+                const index = destination.images?.indexOf(selectedImage || destination.image) || 0;
+                openLightbox(index >= 0 ? index : 0);
+              }}
+            >
               <img 
                 src={selectedImage || destination.image} 
                 alt={destination.title} 
-                className="w-full h-full object-cover transition-all duration-500"
+                className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                <Camera className="text-white opacity-0 group-hover:opacity-100 transition-opacity w-12 h-12" />
+              </div>
               <div className="absolute top-8 left-8 bg-paper/90 backdrop-blur px-6 py-3 rounded-full flex items-center gap-3">
                 <WifiOff className="w-5 h-5 text-ink" />
                 <span className="text-xs uppercase tracking-widest font-bold">
@@ -393,29 +495,6 @@ export const ListingDetail = () => {
                 <CalendarIcon className="w-6 h-6 mb-4 opacity-40" />
                 <h4 className="text-[10px] uppercase tracking-widest mb-2">Disponibilidade</h4>
                 <p className="text-xs opacity-70">Vagas Sazonais Curadas</p>
-              </div>
-            </div>
-
-            {/* Prepare seu Detox Analógico Section */}
-            <div className="pt-12 border-t border-ink/10">
-              <h3 className="text-2xl font-serif mb-8">Prepare seu Detox Analógico</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                {DETOX_PRODUCTS.map(product => (
-                  <div key={product.id} className="bg-white p-6 border border-ink/5 hover:border-ink/20 transition-all group relative">
-                    <product.icon className="w-8 h-8 mb-4 opacity-40 group-hover:opacity-100 transition-opacity" />
-                    <h4 className="text-sm font-semibold mb-1">{product.name}</h4>
-                    <p className="text-[10px] opacity-50 mb-4">{product.description}</p>
-                    <div className="flex items-center justify-between mt-auto">
-                      <span className="text-sm font-serif italic">R$ {product.price}</span>
-                      <button 
-                        onClick={() => addToCart({ id: product.id, name: product.name, price: product.price })}
-                        className="w-8 h-8 rounded-full border border-ink flex items-center justify-center hover:bg-ink hover:text-paper transition-colors"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
           </motion.div>
@@ -460,190 +539,300 @@ export const ListingDetail = () => {
             </div>
             
             <div className="border-t border-ink/10 pt-12">
-              <div className="mb-8 p-6 bg-white border border-ink/10">
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className="text-[10px] uppercase tracking-widest font-bold">Calendário de Disponibilidade</h4>
-                  <div className="flex items-center gap-4">
-                    <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-ink/5 rounded">
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="text-xs font-serif italic capitalize">
-                      {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
-                    </span>
-                    <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-ink/5 rounded">
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+              {destination.valor_venda ? (
+                <div className="bg-white border border-ink/10 p-8">
+                  <div className="mb-8">
+                    <span className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Valor de Venda</span>
+                    <span className="text-5xl font-serif italic text-green-700">R$ {destination.valor_venda.toLocaleString('pt-BR')}</span>
                   </div>
+
+                  <h3 className="text-2xl font-serif mb-6">Tenho Interesse neste Imóvel</h3>
+                  
+                  {leadSuccess ? (
+                    <div className="bg-green-50 text-green-700 p-6 rounded-lg text-center">
+                      <CheckCircle className="w-12 h-12 mx-auto mb-4" />
+                      <p className="font-bold text-lg mb-2">Mensagem enviada!</p>
+                      <p className="text-sm">Recebemos seu interesse. Em breve entraremos em contato para agendar uma visita.</p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmitLead} className="space-y-6">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Nome Completo</label>
+                        <input 
+                          required
+                          type="text" 
+                          value={leadForm.nome}
+                          onChange={e => setLeadForm({...leadForm, nome: e.target.value})}
+                          className="w-full bg-ink/5 border-none p-4 text-sm focus:ring-1 focus:ring-ink outline-none"
+                          placeholder="Seu nome completo"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">E-mail</label>
+                        <input 
+                          required
+                          type="email" 
+                          value={leadForm.email}
+                          onChange={e => setLeadForm({...leadForm, email: e.target.value})}
+                          className="w-full bg-ink/5 border-none p-4 text-sm focus:ring-1 focus:ring-ink outline-none"
+                          placeholder="seu@email.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Telefone / WhatsApp</label>
+                        <input 
+                          required
+                          type="tel" 
+                          value={leadForm.telefone}
+                          onChange={e => setLeadForm({...leadForm, telefone: e.target.value})}
+                          className="w-full bg-ink/5 border-none p-4 text-sm focus:ring-1 focus:ring-ink outline-none"
+                          placeholder="(00) 00000-0000"
+                        />
+                      </div>
+
+                      {leadError && (
+                        <p className="text-red-500 text-xs text-center">{leadError}</p>
+                      )}
+
+                      <button 
+                        type="submit"
+                        disabled={leadLoading}
+                        className="w-full py-6 bg-green-600 text-white text-sm uppercase tracking-[0.3em] hover:bg-green-700 transition-all disabled:opacity-50 font-bold"
+                      >
+                        {leadLoading ? 'Enviando...' : 'Enviar Interesse'}
+                      </button>
+                    </form>
+                  )}
+                  
+                  <p className="text-center text-[10px] uppercase tracking-widest opacity-40 mt-8">
+                    * Ao enviar, você concorda em ser contatado por nossa equipe de vendas.
+                  </p>
                 </div>
-
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (
-                    <div key={idx} className="text-[8px] text-center opacity-40 font-bold">{day}</div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-7 gap-1">
-                  {(() => {
-                    const start = startOfWeek(startOfMonth(currentMonth));
-                    const end = endOfWeek(endOfMonth(currentMonth));
-                    const days = eachDayOfInterval({ start, end });
-
-                    return days.map(day => {
-                      const isCurrentMonth = isSameDay(startOfMonth(day), startOfMonth(currentMonth));
-                      const reserved = isDateReserved(day);
-                      const selected = isDateSelected(day);
-                      const isToday = isSameDay(day, startOfToday());
-                      const isPast = isBefore(day, startOfToday()) && !isToday;
-
-                      return (
-                        <button
-                          key={day.toString()}
-                          onClick={() => handleDateClick(day)}
-                          disabled={isPast || reserved}
-                          className={`
-                            aspect-square flex items-center justify-center text-[10px] transition-all relative
-                            ${!isCurrentMonth ? 'opacity-10' : 'opacity-100'}
-                            ${reserved ? 'bg-blue-500 text-white cursor-not-allowed' : ''}
-                            ${selected ? 'bg-ink text-paper z-10' : ''}
-                            ${!reserved && !selected && !isPast ? 'hover:bg-ink/5' : ''}
-                            ${isPast ? 'opacity-20 cursor-not-allowed' : ''}
-                            ${isToday && !selected ? 'border border-ink/20' : ''}
-                          `}
-                        >
-                          {format(day, 'd')}
-                          {reserved && (
-                            <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white" />
-                          )}
+              ) : (
+                <>
+                  <div className="mb-8 p-6 bg-white border border-ink/10">
+                    <div className="flex items-center justify-between mb-6">
+                      <h4 className="text-[10px] uppercase tracking-widest font-bold">Calendário de Disponibilidade</h4>
+                      <div className="flex items-center gap-4">
+                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-ink/5 rounded">
+                          <ChevronLeft className="w-4 h-4" />
                         </button>
-                      );
-                    });
-                  })()}
-                </div>
+                        <span className="text-xs font-serif italic capitalize">
+                          {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+                        </span>
+                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-ink/5 rounded">
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
 
-                <div className="mt-6 flex flex-wrap gap-4 pt-4 border-t border-ink/5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500" />
-                    <span className="text-[8px] uppercase tracking-widest opacity-50">Reservado</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-ink" />
-                    <span className="text-[8px] uppercase tracking-widest opacity-50">Sua Seleção</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 border border-ink/20" />
-                    <span className="text-[8px] uppercase tracking-widest opacity-50">Hoje</span>
-                  </div>
-                </div>
-              </div>
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                      {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (
+                        <div key={idx} className="text-[8px] text-center opacity-40 font-bold">{day}</div>
+                      ))}
+                    </div>
 
-              {bookedDates.length > 0 && (
-                <div className="mb-8 p-6 bg-ink/5 border border-ink/10">
-                  <h4 className="text-[10px] uppercase tracking-widest opacity-50 mb-4 flex items-center gap-2">
-                    <CalendarIcon className="w-3 h-3" /> Datas Indisponíveis
-                  </h4>
-                  <ul className="space-y-3">
-                    {bookedDates.map((period, idx) => {
-                      // Adding timezone offset to prevent date shifting
-                      const start = new Date(period.check_in + 'T12:00:00Z').toLocaleDateString('pt-BR');
-                      const end = new Date(period.check_out + 'T12:00:00Z').toLocaleDateString('pt-BR');
-                      return (
-                        <li key={idx} className="text-xs opacity-70 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500/70" />
-                            {start} até {end}
-                          </div>
-                          {isAdmin && (
-                            <button 
-                              onClick={() => handleDeleteBooking(period.id)}
-                              className="text-red-500 hover:text-red-700 p-1"
-                              title="Excluir Reserva"
+                    <div className="grid grid-cols-7 gap-1">
+                      {(() => {
+                        const start = startOfWeek(startOfMonth(currentMonth));
+                        const end = endOfWeek(endOfMonth(currentMonth));
+                        const days = eachDayOfInterval({ start, end });
+
+                        return days.map(day => {
+                          const isCurrentMonth = isSameDay(startOfMonth(day), startOfMonth(currentMonth));
+                          const reserved = isDateReserved(day);
+                          const selected = isDateSelected(day);
+                          const isToday = isSameDay(day, startOfToday());
+                          const isPast = isBefore(day, startOfToday()) && !isToday;
+
+                          return (
+                            <button
+                              key={day.toString()}
+                              onClick={() => handleDateClick(day)}
+                              disabled={isPast || reserved}
+                              className={`
+                                aspect-square flex items-center justify-center text-[10px] transition-all relative
+                                ${!isCurrentMonth ? 'opacity-10' : 'opacity-100'}
+                                ${reserved ? 'bg-blue-500 text-white cursor-not-allowed' : ''}
+                                ${selected ? 'bg-ink text-paper z-10' : ''}
+                                ${!reserved && !selected && !isPast ? 'hover:bg-ink/5' : ''}
+                                ${isPast ? 'opacity-20 cursor-not-allowed' : ''}
+                                ${isToday && !selected ? 'border border-ink/20' : ''}
+                              `}
                             >
-                              <Trash2 className="w-3 h-3" />
+                              {format(day, 'd')}
+                              {reserved && (
+                                <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white" />
+                              )}
                             </button>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
+                          );
+                        });
+                      })()}
+                    </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div>
-                  <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Check-in</label>
-                  <input 
-                    type="date" 
-                    value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
-                    className="w-full bg-ink/5 border-none p-3 text-sm focus:ring-1 focus:ring-ink outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Check-out</label>
-                  <input 
-                    type="date" 
-                    value={checkOut}
-                    onChange={(e) => setCheckOut(e.target.value)}
-                    className="w-full bg-ink/5 border-none p-3 text-sm focus:ring-1 focus:ring-ink outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <span className="text-[10px] uppercase tracking-widest opacity-50 block">Preço por noite</span>
-                  <span className="text-4xl font-serif italic">${destination.price}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase tracking-widest opacity-50 block">Total (incl. taxa de 15%)</span>
-                  <span className="text-2xl font-serif italic">
-                    {calculateTotal() > 0 ? `$${calculateTotal().toFixed(2)}` : '--'}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="mb-6 space-y-2">
-                {cartTotal > 0 && (
-                  <div className="flex justify-between text-[10px] uppercase tracking-widest opacity-60">
-                    <span>Adicionais do Kit Analógico</span>
-                    <span>R$ {cartTotal.toFixed(2)}</span>
+                    <div className="mt-6 flex flex-wrap gap-4 pt-4 border-t border-ink/5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-500" />
+                        <span className="text-[8px] uppercase tracking-widest opacity-50">Reservado</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-ink" />
+                        <span className="text-[8px] uppercase tracking-widest opacity-50">Sua Seleção</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 border border-ink/20" />
+                        <span className="text-[8px] uppercase tracking-widest opacity-50">Hoje</span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-              
-              <button 
-                onClick={handleBooking}
-                disabled={!isDateRangeAvailable()}
-                className="w-full py-6 bg-ink text-paper text-sm uppercase tracking-[0.3em] hover:bg-ink/90 transition-all disabled:opacity-50"
-              >
-                {bookingStatus === 'loading' ? 'Processando...' : 'Solicitar Reserva'}
-              </button>
 
-              {!isDateRangeAvailable() && (
-                <p className="text-center text-red-600 text-[10px] uppercase tracking-widest mt-4">
-                  Período indisponível. Conflito com reservas existentes.
-                </p>
-              )}
-              {bookingStatus === 'error' && (!checkIn || !checkOut) && (
-                <p className="text-center text-red-600 text-[10px] uppercase tracking-widest mt-4">
-                  Por favor, selecione as datas de check-in e check-out.
-                </p>
-              )}
-              {bookingStatus === 'error' && checkIn && checkOut && (
-                <p className="text-center text-red-600 text-[10px] uppercase tracking-widest mt-4">
-                  Erro ao processar reserva. Tente novamente.
-                </p>
-              )}
+                  {bookedDates.length > 0 && (
+                    <div className="mb-8 p-6 bg-ink/5 border border-ink/10">
+                      <h4 className="text-[10px] uppercase tracking-widest opacity-50 mb-4 flex items-center gap-2">
+                        <CalendarIcon className="w-3 h-3" /> Datas Indisponíveis
+                      </h4>
+                      <ul className="space-y-3">
+                        {bookedDates.map((period, idx) => {
+                          // Adding timezone offset to prevent date shifting
+                          const start = new Date(period.check_in + 'T12:00:00Z').toLocaleDateString('pt-BR');
+                          const end = new Date(period.check_out + 'T12:00:00Z').toLocaleDateString('pt-BR');
+                          return (
+                            <li key={idx} className="text-xs opacity-70 flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500/70" />
+                                {start} até {end}
+                              </div>
+                              {isAdmin && (
+                                <button 
+                                  onClick={() => handleDeleteBooking(period.id)}
+                                  className="text-red-500 hover:text-red-700 p-1"
+                                  title="Excluir Reserva"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
 
-              <p className="text-center text-[10px] uppercase tracking-widest opacity-40 mt-4">
-                * Todas as reservas incluem uma orientação obrigatória livre de dispositivos.
-              </p>
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Check-in</label>
+                      <input 
+                        type="date" 
+                        value={checkIn}
+                        onChange={(e) => setCheckIn(e.target.value)}
+                        className="w-full bg-ink/5 border-none p-3 text-sm focus:ring-1 focus:ring-ink outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Check-out</label>
+                      <input 
+                        type="date" 
+                        value={checkOut}
+                        onChange={(e) => setCheckOut(e.target.value)}
+                        className="w-full bg-ink/5 border-none p-3 text-sm focus:ring-1 focus:ring-ink outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-widest opacity-50 block">Preço por noite</span>
+                      <span className="text-4xl font-serif italic">${destination.price}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase tracking-widest opacity-50 block">Total (incl. taxa de 15%)</span>
+                      <span className="text-2xl font-serif italic">
+                        {calculateTotal() > 0 ? `$${calculateTotal().toFixed(2)}` : '--'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={handleBooking}
+                    disabled={!isDateRangeAvailable()}
+                    className="w-full py-6 bg-ink text-paper text-sm uppercase tracking-[0.3em] hover:bg-ink/90 transition-all disabled:opacity-50"
+                  >
+                    {bookingStatus === 'loading' ? 'Processando...' : 'Solicitar Reserva'}
+                  </button>
+
+                  {!isDateRangeAvailable() && (
+                    <p className="text-center text-red-600 text-[10px] uppercase tracking-widest mt-4">
+                      Período indisponível. Conflito com reservas existentes.
+                    </p>
+                  )}
+                  {bookingStatus === 'error' && (!checkIn || !checkOut) && (
+                    <p className="text-center text-red-600 text-[10px] uppercase tracking-widest mt-4">
+                      Por favor, selecione as datas de check-in e check-out.
+                    </p>
+                  )}
+                  {bookingStatus === 'error' && checkIn && checkOut && (
+                    <p className="text-center text-red-600 text-[10px] uppercase tracking-widest mt-4">
+                      Erro ao processar reserva. Tente novamente.
+                    </p>
+                  )}
+
+                  <p className="text-center text-[10px] uppercase tracking-widest opacity-40 mt-4">
+                    * Todas as reservas incluem uma orientação obrigatória livre de dispositivos.
+                  </p>
+                </>
+              )}
             </div>
           </motion.div>
         </div>
       </main>
       
       <Footer />
+
+      {/* Lightbox Modal */}
+      {isLightboxOpen && destination?.images && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 md:p-12"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          <button 
+            className="absolute top-8 right-8 text-white hover:scale-110 transition-transform z-[110]"
+            onClick={() => setIsLightboxOpen(false)}
+          >
+            <X className="w-10 h-10" />
+          </button>
+
+          <button 
+            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-[110]"
+            onClick={prevImage}
+          >
+            <ChevronLeft className="w-12 h-12 md:w-16 md:h-16" />
+          </button>
+
+          <div className="relative max-w-5xl w-full h-full flex items-center justify-center">
+            <motion.img 
+              key={lightboxIndex}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              src={destination.images[lightboxIndex]} 
+              alt={`Gallery Full ${lightboxIndex + 1}`}
+              className="max-w-full max-h-full object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              referrerPolicy="no-referrer"
+            />
+            
+            <div className="absolute bottom-[-40px] left-0 right-0 text-center text-white/60 text-xs uppercase tracking-widest">
+              Imagem {lightboxIndex + 1} de {destination.images.length}
+            </div>
+          </div>
+
+          <button 
+            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-[110]"
+            onClick={nextImage}
+          >
+            <ChevronRight className="w-12 h-12 md:w-16 md:h-16" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

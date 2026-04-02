@@ -9,6 +9,9 @@ export interface Destination {
   signalStrength: 0 | 1 | 2; // 0 = No signal, 1 = Weak, 2 = Spotty
   tags: string[];
   features: string[];
+  valor_venda?: number;
+  bairro?: string;
+  quantidade_quartos?: number;
 }
 
 export interface Experience {

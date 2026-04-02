@@ -627,7 +627,7 @@ export const Profile = () => {
             {isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}
           </h1>
           <p className="text-xs text-center opacity-50 uppercase tracking-widest mb-8">
-            {isLogin ? 'Acesse seu santuário' : 'Junte-se ao Unplugged Bliss'}
+            {isLogin ? 'Acesse seu santuário' : 'Junte-se ao Hub Temporada'}
           </p>
 
           {message && (
