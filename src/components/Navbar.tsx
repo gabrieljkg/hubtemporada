@@ -40,14 +40,28 @@ export const Navbar = () => {
   return (
     <nav className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md">
       <div className="nav-grid flex items-center justify-between">
-        <div className="flex items-center">
+        <div className="flex items-center gap-4">
+          <div className="relative group">
+            <button className="nav-item flex items-center gap-2 hover:opacity-60 transition-opacity py-4">
+              <Menu className="w-4 h-4" />
+              <span>Explorar</span>
+            </button>
+            <div className="absolute top-full left-0 bg-white shadow-lg border border-ink/10 rounded-lg py-2 min-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+              <Link to="/?mode=aluguel" className="block px-4 py-2 text-sm hover:bg-ink/5">Aluguel</Link>
+              <Link to="/?mode=venda" className="block px-4 py-2 text-sm hover:bg-ink/5">Comprar Imóvel</Link>
+              <div className="h-px bg-ink/10 my-1"></div>
+              <Link to="/anunciar" className="block px-4 py-2 text-sm hover:bg-ink/5">+ Anunciar Aluguel</Link>
+              <Link to="/anunciar-venda" className="block px-4 py-2 text-sm hover:bg-ink/5">+ Cadastrar Venda</Link>
+            </div>
+          </div>
+
           {!isSearchOpen ? (
             <button 
               onClick={() => setIsSearchOpen(true)}
               className="nav-item flex items-center gap-2 hover:opacity-60 transition-opacity"
             >
-              <Menu className="w-4 h-4" />
-              <span>Explorar</span>
+              <Search className="w-4 h-4" />
+              <span className="hidden md:inline">Buscar</span>
             </button>
           ) : (
             <div className="nav-item flex items-center gap-2 bg-paper/50 px-3 py-1 rounded-full border border-ink/10">
@@ -63,10 +77,6 @@ export const Navbar = () => {
               />
             </div>
           )}
-          <div className="nav-item hidden md:flex items-center gap-2">
-            <Search className="w-4 h-4" />
-            <span>Imóveis Premium</span>
-          </div>
         </div>
         
         <Link to="/" className="text-2xl font-serif tracking-widest uppercase py-4 px-8 border-x border-ink/20">
