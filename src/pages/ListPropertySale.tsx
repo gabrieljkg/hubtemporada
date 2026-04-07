@@ -11,6 +11,7 @@ export const ListPropertySale = () => {
 
   const [formData, setFormData] = useState({
     title: '',
+    cidade: '',
     bairro: '',
     quartos: '',
     valor_venda: ''
@@ -85,6 +86,7 @@ export const ListPropertySale = () => {
       // 2. Save to imoveis table
       const payload = {
         titulo: formData.title,
+        cidade: formData.cidade,
         bairro: formData.bairro,
         quartos: parseInt(formData.quartos),
         valor: parseFloat(formData.valor_venda),
@@ -100,7 +102,7 @@ export const ListPropertySale = () => {
       }
 
       setSuccess(true);
-      setFormData({ title: '', bairro: '', quartos: '', valor_venda: '' });
+      setFormData({ title: '', cidade: '', bairro: '', quartos: '', valor_venda: '' });
       setImageFiles([]);
       setImagePreviews([]);
     } catch (err: any) {
@@ -164,6 +166,17 @@ export const ListPropertySale = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
+                <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Cidade *</label>
+                <input 
+                  required 
+                  type="text" 
+                  value={formData.cidade} 
+                  onChange={e => setFormData({...formData, cidade: e.target.value})} 
+                  placeholder="Ex: Uberlândia" 
+                  className="w-full bg-ink/5 border-none p-3 rounded-lg text-sm focus:ring-2 focus:ring-ink outline-none" 
+                />
+              </div>
+              <div>
                 <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Bairro *</label>
                 <input 
                   required 
@@ -174,6 +187,9 @@ export const ListPropertySale = () => {
                   className="w-full bg-ink/5 border-none p-3 rounded-lg text-sm focus:ring-2 focus:ring-ink outline-none" 
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Quantidade de Quartos *</label>
                 <input 
@@ -186,20 +202,19 @@ export const ListPropertySale = () => {
                   className="w-full bg-ink/5 border-none p-3 rounded-lg text-sm focus:ring-2 focus:ring-ink outline-none" 
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Valor Total do Imóvel (R$) *</label>
-              <input 
-                required 
-                type="number" 
-                min="0"
-                step="0.01"
-                value={formData.valor_venda} 
-                onChange={e => setFormData({...formData, valor_venda: e.target.value})} 
-                placeholder="Ex: 500000" 
-                className="w-full bg-ink/5 border-none p-3 rounded-lg text-sm focus:ring-2 focus:ring-ink outline-none" 
-              />
+              <div>
+                <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Valor Total do Imóvel (R$) *</label>
+                <input 
+                  required 
+                  type="number" 
+                  min="0"
+                  step="0.01"
+                  value={formData.valor_venda} 
+                  onChange={e => setFormData({...formData, valor_venda: e.target.value})} 
+                  placeholder="Ex: 500000" 
+                  className="w-full bg-ink/5 border-none p-3 rounded-lg text-sm focus:ring-2 focus:ring-ink outline-none" 
+                />
+              </div>
             </div>
 
             <div>
