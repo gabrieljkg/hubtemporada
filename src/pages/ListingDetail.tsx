@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 import { WifiOff, ShieldCheck, Calendar as CalendarIcon, MapPin, ArrowLeft, Camera, Notebook, Map as MapIcon, Plus, Trash2, ChevronLeft, ChevronRight, X, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useCart } from '../context/CartContext';
-import { useAdmin, ADMIN_EMAIL } from '../hooks/useAdmin';
+import { useAdmin, ADMIN_EMAILS } from '../hooks/useAdmin';
 import { 
   format, 
   startOfMonth, 
@@ -358,7 +358,7 @@ export const ListingDetail = () => {
     const { data: { session } } = await supabase.auth.getSession();
     const userEmail = session?.user?.email?.toLowerCase();
     
-    if (userEmail !== ADMIN_EMAIL.toLowerCase()) {
+    if (!userEmail || !ADMIN_EMAILS.includes(userEmail)) {
       console.error('Tentativa de exclusão negada: Usuário não é administrador', userEmail);
       alert('Acesso negado. Apenas o administrador pode excluir anúncios.');
       return;
@@ -494,251 +494,154 @@ export const ListingDetail = () => {
               <div className="bg-ink/5 p-6">
                 <CalendarIcon className="w-6 h-6 mb-4 opacity-40" />
                 <h4 className="text-[10px] uppercase tracking-widest mb-2">Disponibilidade</h4>
-                <p className="text-xs opacity-70">Vagas Sazonais Curadas</p>
+                <p className="text-xs opacity-70">Aberto o ano todo</p>
               </div>
             </div>
           </motion.div>
-          
+
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex flex-col justify-between"
+            className="flex flex-col"
           >
-            <div>
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] opacity-50 mb-6">
-                <MapPin className="w-4 h-4" />
+            <div className="mb-12">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest opacity-50 mb-4">
+                <MapPin className="w-3 h-3" />
                 {destination.location}
               </div>
-              <div className="flex justify-between items-start gap-4 mb-8">
-                <h1 className="text-6xl md:text-7xl font-serif">{destination.title}</h1>
-                {isAdmin && (
-                  <button 
-                    onClick={handleDelete}
-                    className="mt-4 p-3 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all rounded-full shadow-sm"
-                    title="Excluir Anúncio"
-                  >
-                    <Trash2 className="w-6 h-6" />
-                  </button>
-                )}
-              </div>
-              <p className="text-lg text-ink/70 leading-relaxed mb-12">
+              <h1 className="text-5xl font-serif mb-6">{destination.title}</h1>
+              <p className="text-ink/70 leading-relaxed">
                 {destination.description}
               </p>
-              
-              <div className="space-y-6 mb-12">
-                <h4 className="text-[11px] uppercase tracking-widest opacity-50">Características do Santuário</h4>
-                <ul className="grid grid-cols-2 gap-4">
-                  {destination.features?.map((feature, i) => (
-                    <li key={i} className="flex items-center gap-3 text-sm">
-                      <div className="w-1.5 h-1.5 rounded-full bg-ink/20" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
-            
-            <div className="border-t border-ink/10 pt-12">
-              {destination.valor_venda ? (
-                <div className="bg-white border border-ink/10 p-8">
-                  <div className="mb-8">
-                    <span className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Valor de Venda</span>
-                    <span className="text-5xl font-serif italic text-green-700">R$ {destination.valor_venda.toLocaleString('pt-BR')}</span>
+
+            {/* Renderiza o formulário de interesse SE for imóvel de venda */}
+            {destination.valor_venda ? (
+              <div className="bg-ink/5 p-8 mt-auto">
+                <h3 className="text-2xl font-serif mb-2">Tenho Interesse</h3>
+                <p className="text-sm opacity-60 mb-6">
+                  Preencha seus dados abaixo e entraremos em contato sobre o imóvel <strong>{destination.title}</strong>.
+                </p>
+
+                {leadSuccess ? (
+                  <div className="bg-green-50 text-green-700 p-6 rounded-lg text-center">
+                    <CheckCircle className="w-8 h-8 mx-auto mb-2" />
+                    <p className="font-bold mb-1">Mensagem enviada com sucesso!</p>
+                    <p className="text-sm">Em breve nossa equipe entrará em contato.</p>
                   </div>
-
-                  <h3 className="text-2xl font-serif mb-6">Tenho Interesse neste Imóvel</h3>
-                  
-                  {leadSuccess ? (
-                    <div className="bg-green-50 text-green-700 p-6 rounded-lg text-center">
-                      <CheckCircle className="w-12 h-12 mx-auto mb-4" />
-                      <p className="font-bold text-lg mb-2">Mensagem enviada!</p>
-                      <p className="text-sm">Recebemos seu interesse. Em breve entraremos em contato para agendar uma visita.</p>
+                ) : (
+                  <form onSubmit={handleSubmitLead} className="space-y-4">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-1">Nome Completo</label>
+                      <input 
+                        required
+                        type="text" 
+                        value={leadForm.nome}
+                        onChange={e => setLeadForm({...leadForm, nome: e.target.value})}
+                        className="w-full bg-white border border-ink/10 p-3 text-sm outline-none focus:ring-1 focus:ring-ink rounded"
+                        placeholder="Seu nome"
+                      />
                     </div>
-                  ) : (
-                    <form onSubmit={handleSubmitLead} className="space-y-6">
-                      <div>
-                        <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Nome Completo</label>
-                        <input 
-                          required
-                          type="text" 
-                          value={leadForm.nome}
-                          onChange={e => setLeadForm({...leadForm, nome: e.target.value})}
-                          className="w-full bg-ink/5 border-none p-4 text-sm focus:ring-1 focus:ring-ink outline-none"
-                          placeholder="Seu nome completo"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">E-mail</label>
-                        <input 
-                          required
-                          type="email" 
-                          value={leadForm.email}
-                          onChange={e => setLeadForm({...leadForm, email: e.target.value})}
-                          className="w-full bg-ink/5 border-none p-4 text-sm focus:ring-1 focus:ring-ink outline-none"
-                          placeholder="seu@email.com"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Telefone / WhatsApp</label>
-                        <input 
-                          required
-                          type="tel" 
-                          value={leadForm.telefone}
-                          onChange={e => setLeadForm({...leadForm, telefone: e.target.value})}
-                          className="w-full bg-ink/5 border-none p-4 text-sm focus:ring-1 focus:ring-ink outline-none"
-                          placeholder="(00) 00000-0000"
-                        />
-                      </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-1">E-mail</label>
+                      <input 
+                        required
+                        type="email" 
+                        value={leadForm.email}
+                        onChange={e => setLeadForm({...leadForm, email: e.target.value})}
+                        className="w-full bg-white border border-ink/10 p-3 text-sm outline-none focus:ring-1 focus:ring-ink rounded"
+                        placeholder="seu@email.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-1">Telefone / WhatsApp</label>
+                      <input 
+                        required
+                        type="tel" 
+                        value={leadForm.telefone}
+                        onChange={e => setLeadForm({...leadForm, telefone: e.target.value})}
+                        className="w-full bg-white border border-ink/10 p-3 text-sm outline-none focus:ring-1 focus:ring-ink rounded"
+                        placeholder="(00) 00000-0000"
+                      />
+                    </div>
 
-                      {leadError && (
-                        <p className="text-red-500 text-xs text-center">{leadError}</p>
-                      )}
+                    {leadError && (
+                      <p className="text-red-500 text-xs text-center">{leadError}</p>
+                    )}
 
-                      <button 
-                        type="submit"
-                        disabled={leadLoading}
-                        className="w-full py-6 bg-green-600 text-white text-sm uppercase tracking-[0.3em] hover:bg-green-700 transition-all disabled:opacity-50 font-bold"
-                      >
-                        {leadLoading ? 'Enviando...' : 'Enviar Interesse'}
-                      </button>
-                    </form>
-                  )}
-                  
-                  <p className="text-center text-[10px] uppercase tracking-widest opacity-40 mt-8">
-                    * Ao enviar, você concorda em ser contatado por nossa equipe de vendas.
-                  </p>
+                    <button 
+                      type="submit"
+                      disabled={leadLoading}
+                      className="w-full bg-green-600 text-white py-4 text-[10px] uppercase tracking-widest font-bold hover:bg-green-700 transition-colors rounded mt-4 disabled:opacity-50"
+                    >
+                      {leadLoading ? 'Enviando...' : 'Enviar Interesse'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : (
+              /* Renderiza o calendário SE for imóvel de aluguel */
+              <div className="bg-ink/5 p-8 mt-auto">
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-sm uppercase tracking-widest font-bold">Selecione as Datas</h3>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                      className="p-2 hover:bg-ink/10 rounded-full transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-sm font-medium min-w-[100px] text-center">
+                      {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+                    </span>
+                    <button 
+                      onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                      className="p-2 hover:bg-ink/10 rounded-full transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <>
-                  <div className="mb-8 p-6 bg-white border border-ink/10">
-                    <div className="flex items-center justify-between mb-6">
-                      <h4 className="text-[10px] uppercase tracking-widest font-bold">Calendário de Disponibilidade</h4>
-                      <div className="flex items-center gap-4">
-                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-ink/5 rounded">
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <span className="text-xs font-serif italic capitalize">
-                          {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
-                        </span>
-                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-ink/5 rounded">
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </div>
+
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                    <div key={day} className="text-center text-[10px] uppercase tracking-widest opacity-50 py-2">
+                      {day}
                     </div>
+                  ))}
+                </div>
 
-                    <div className="grid grid-cols-7 gap-1 mb-2">
-                      {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (
-                        <div key={idx} className="text-[8px] text-center opacity-40 font-bold">{day}</div>
-                      ))}
-                    </div>
+                <div className="grid grid-cols-7 gap-1 mb-8">
+                  {eachDayOfInterval({
+                    start: startOfWeek(startOfMonth(currentMonth)),
+                    end: endOfWeek(endOfMonth(currentMonth))
+                  }).map((date, i) => {
+                    const isSelected = isDateSelected(date);
+                    const isReserved = isDateReserved(date);
+                    const isPast = isBefore(date, startOfToday());
+                    const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
 
-                    <div className="grid grid-cols-7 gap-1">
-                      {(() => {
-                        const start = startOfWeek(startOfMonth(currentMonth));
-                        const end = endOfWeek(endOfMonth(currentMonth));
-                        const days = eachDayOfInterval({ start, end });
+                    return (
+                      <button
+                        key={i}
+                        disabled={isReserved || isPast}
+                        onClick={() => handleDateClick(date)}
+                        className={`
+                          aspect-square flex items-center justify-center text-sm transition-all
+                          ${!isCurrentMonth ? 'opacity-20' : ''}
+                          ${isPast ? 'opacity-20 cursor-not-allowed' : ''}
+                          ${isReserved ? 'bg-red-50 text-red-300 cursor-not-allowed line-through' : ''}
+                          ${isSelected ? 'bg-ink text-paper' : 'hover:bg-ink/10'}
+                          ${!isReserved && !isPast && !isSelected ? 'cursor-pointer' : ''}
+                        `}
+                      >
+                        {format(date, 'd')}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                        return days.map(day => {
-                          const isCurrentMonth = isSameDay(startOfMonth(day), startOfMonth(currentMonth));
-                          const reserved = isDateReserved(day);
-                          const selected = isDateSelected(day);
-                          const isToday = isSameDay(day, startOfToday());
-                          const isPast = isBefore(day, startOfToday()) && !isToday;
-
-                          return (
-                            <button
-                              key={day.toString()}
-                              onClick={() => handleDateClick(day)}
-                              disabled={isPast || reserved}
-                              className={`
-                                aspect-square flex items-center justify-center text-[10px] transition-all relative
-                                ${!isCurrentMonth ? 'opacity-10' : 'opacity-100'}
-                                ${reserved ? 'bg-blue-500 text-white cursor-not-allowed' : ''}
-                                ${selected ? 'bg-ink text-paper z-10' : ''}
-                                ${!reserved && !selected && !isPast ? 'hover:bg-ink/5' : ''}
-                                ${isPast ? 'opacity-20 cursor-not-allowed' : ''}
-                                ${isToday && !selected ? 'border border-ink/20' : ''}
-                              `}
-                            >
-                              {format(day, 'd')}
-                              {reserved && (
-                                <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white" />
-                              )}
-                            </button>
-                          );
-                        });
-                      })()}
-                    </div>
-
-                    <div className="mt-6 flex flex-wrap gap-4 pt-4 border-t border-ink/5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-blue-500" />
-                        <span className="text-[8px] uppercase tracking-widest opacity-50">Reservado</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-ink" />
-                        <span className="text-[8px] uppercase tracking-widest opacity-50">Sua Seleção</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 border border-ink/20" />
-                        <span className="text-[8px] uppercase tracking-widest opacity-50">Hoje</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {bookedDates.length > 0 && (
-                    <div className="mb-8 p-6 bg-ink/5 border border-ink/10">
-                      <h4 className="text-[10px] uppercase tracking-widest opacity-50 mb-4 flex items-center gap-2">
-                        <CalendarIcon className="w-3 h-3" /> Datas Indisponíveis
-                      </h4>
-                      <ul className="space-y-3">
-                        {bookedDates.map((period, idx) => {
-                          // Adding timezone offset to prevent date shifting
-                          const start = new Date(period.check_in + 'T12:00:00Z').toLocaleDateString('pt-BR');
-                          const end = new Date(period.check_out + 'T12:00:00Z').toLocaleDateString('pt-BR');
-                          return (
-                            <li key={idx} className="text-xs opacity-70 flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500/70" />
-                                {start} até {end}
-                              </div>
-                              {isAdmin && (
-                                <button 
-                                  onClick={() => handleDeleteBooking(period.id)}
-                                  className="text-red-500 hover:text-red-700 p-1"
-                                  title="Excluir Reserva"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Check-in</label>
-                      <input 
-                        type="date" 
-                        value={checkIn}
-                        onChange={(e) => setCheckIn(e.target.value)}
-                        className="w-full bg-ink/5 border-none p-3 text-sm focus:ring-1 focus:ring-ink outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest opacity-50 block mb-2">Check-out</label>
-                      <input 
-                        type="date" 
-                        value={checkOut}
-                        onChange={(e) => setCheckOut(e.target.value)}
-                        className="w-full bg-ink/5 border-none p-3 text-sm focus:ring-1 focus:ring-ink outline-none"
-                      />
-                    </div>
-                  </div>
-
+                <div className="border-t border-ink/10 pt-8">
                   <div className="flex items-center justify-between mb-8">
                     <div>
                       <span className="text-[10px] uppercase tracking-widest opacity-50 block">Preço por noite</span>
@@ -762,77 +665,96 @@ export const ListingDetail = () => {
 
                   {!isDateRangeAvailable() && (
                     <p className="text-center text-red-600 text-[10px] uppercase tracking-widest mt-4">
-                      Período indisponível. Conflito com reservas existentes.
+                      Por favor, selecione datas válidas
                     </p>
                   )}
-                  {bookingStatus === 'error' && (!checkIn || !checkOut) && (
-                    <p className="text-center text-red-600 text-[10px] uppercase tracking-widest mt-4">
-                      Por favor, selecione as datas de check-in e check-out.
-                    </p>
-                  )}
-                  {bookingStatus === 'error' && checkIn && checkOut && (
-                    <p className="text-center text-red-600 text-[10px] uppercase tracking-widest mt-4">
-                      Erro ao processar reserva. Tente novamente.
-                    </p>
-                  )}
+                </div>
+              </div>
+            )}
+            
+            {isAdmin && (
+              <div className="mt-8 pt-8 border-t border-ink/10">
+                <h3 className="text-sm font-bold uppercase tracking-widest mb-4 text-red-600 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" />
+                  Área do Administrador
+                </h3>
+                
+                <button
+                  onClick={handleDelete}
+                  className="w-full py-4 border-2 border-red-600 text-red-600 text-sm uppercase tracking-widest hover:bg-red-50 transition-colors flex items-center justify-center gap-2 font-bold"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Excluir Anúncio Permanentemente
+                </button>
 
-                  <p className="text-center text-[10px] uppercase tracking-widest opacity-40 mt-4">
-                    * Todas as reservas incluem uma orientação obrigatória livre de dispositivos.
-                  </p>
-                </>
-              )}
-            </div>
+                {/* Mostra reservas apenas se for imóvel de aluguel */}
+                {!destination.valor_venda && bookedDates.length > 0 && (
+                  <div className="mt-8">
+                    <h4 className="text-xs font-bold uppercase tracking-widest mb-4">Reservas Ativas neste Imóvel</h4>
+                    <div className="space-y-2">
+                      {bookedDates.map(booking => (
+                        <div key={booking.id} className="flex items-center justify-between bg-white p-3 border border-ink/10 rounded text-sm">
+                          <div>
+                            <span className="font-medium">{format(parseISO(booking.check_in), 'dd/MM/yyyy')}</span>
+                            <span className="mx-2 opacity-50">até</span>
+                            <span className="font-medium">{format(parseISO(booking.check_out), 'dd/MM/yyyy')}</span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteBooking(booking.id)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Cancelar Reserva"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         </div>
       </main>
-      
-      <Footer />
 
       {/* Lightbox Modal */}
-      {isLightboxOpen && destination?.images && (
-        <div 
-          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 md:p-12"
-          onClick={() => setIsLightboxOpen(false)}
-        >
+      {isLightboxOpen && destination.images && (
+        <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
           <button 
-            className="absolute top-8 right-8 text-white hover:scale-110 transition-transform z-[110]"
             onClick={() => setIsLightboxOpen(false)}
+            className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors z-50"
           >
-            <X className="w-10 h-10" />
+            <X className="w-8 h-8" />
           </button>
-
-          <button 
-            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-[110]"
-            onClick={prevImage}
-          >
-            <ChevronLeft className="w-12 h-12 md:w-16 md:h-16" />
-          </button>
-
-          <div className="relative max-w-5xl w-full h-full flex items-center justify-center">
-            <motion.img 
-              key={lightboxIndex}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              src={destination.images[lightboxIndex]} 
-              alt={`Gallery Full ${lightboxIndex + 1}`}
-              className="max-w-full max-h-full object-contain shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-              referrerPolicy="no-referrer"
-            />
-            
-            <div className="absolute bottom-[-40px] left-0 right-0 text-center text-white/60 text-xs uppercase tracking-widest">
-              Imagem {lightboxIndex + 1} de {destination.images.length}
-            </div>
+          
+          <div className="absolute top-6 left-6 text-white/50 text-sm tracking-widest uppercase">
+            Imagem {lightboxIndex + 1} de {destination.images.length}
           </div>
 
           <button 
-            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-[110]"
-            onClick={nextImage}
+            onClick={prevImage}
+            className="absolute left-6 text-white/50 hover:text-white transition-colors p-4 z-50"
           >
-            <ChevronRight className="w-12 h-12 md:w-16 md:h-16" />
+            <ChevronLeft className="w-12 h-12" />
+          </button>
+
+          <img 
+            src={destination.images[lightboxIndex]} 
+            alt="Gallery Fullscreen" 
+            className="max-h-[90vh] max-w-[90vw] object-contain"
+            referrerPolicy="no-referrer"
+          />
+
+          <button 
+            onClick={nextImage}
+            className="absolute right-6 text-white/50 hover:text-white transition-colors p-4 z-50"
+          >
+            <ChevronRight className="w-12 h-12" />
           </button>
         </div>
       )}
+
+      <Footer />
     </div>
   );
 };
