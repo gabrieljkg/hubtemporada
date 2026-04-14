@@ -3,8 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Destination } from '../data/mockData';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { motion } from 'motion/react';
-import { WifiOff, ShieldCheck, Calendar as CalendarIcon, MapPin, ArrowLeft, Camera, Notebook, Map as MapIcon, Plus, Trash2, ChevronLeft, ChevronRight, X, CheckCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { WifiOff, ShieldCheck, Calendar as CalendarIcon, MapPin, ArrowLeft, Camera, Notebook, Map as MapIcon, Plus, Trash2, ChevronLeft, ChevronRight, X, CheckCircle, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useCart } from '../context/CartContext';
 import { useAdmin, ADMIN_EMAILS } from '../hooks/useAdmin';
@@ -135,6 +135,29 @@ export const ListingDetail = () => {
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // Notification state
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationData, setNotificationData] = useState({ city: '', action: '' });
+
+  const CITIES = ['São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Curitiba', 'Brasília', 'Salvador', 'Fortaleza', 'Goiânia', 'Campinas', 'Ribeirão Preto', 'Uberlândia'];
+  const ACTIONS = ['acabou de visualizar este imóvel', 'está de olho neste imóvel', 'adicionou este imóvel aos favoritos'];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const randomCity = CITIES[Math.floor(Math.random() * CITIES.length)];
+      const randomAction = ACTIONS[Math.floor(Math.random() * ACTIONS.length)];
+      
+      setNotificationData({ city: randomCity, action: randomAction });
+      setShowNotification(true);
+
+      setTimeout(() => {
+        setShowNotification(false);
+      }, 5000); // Hide after 5 seconds
+    }, 10000); // Trigger every 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const openLightbox = (index: number) => {
     setLightboxIndex(index);
@@ -716,45 +739,80 @@ export const ListingDetail = () => {
           </motion.div>
         </div>
       </main>
+      
+      <Footer />
 
       {/* Lightbox Modal */}
-      {isLightboxOpen && destination.images && (
-        <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+      {isLightboxOpen && destination?.images && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 md:p-12"
+          onClick={() => setIsLightboxOpen(false)}
+        >
           <button 
+            className="absolute top-8 right-8 text-white hover:scale-110 transition-transform z-[110]"
             onClick={() => setIsLightboxOpen(false)}
-            className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors z-50"
           >
-            <X className="w-8 h-8" />
+            <X className="w-10 h-10" />
           </button>
-          
-          <div className="absolute top-6 left-6 text-white/50 text-sm tracking-widest uppercase">
-            Imagem {lightboxIndex + 1} de {destination.images.length}
+
+          <button 
+            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-[110]"
+            onClick={prevImage}
+          >
+            <ChevronLeft className="w-12 h-12 md:w-16 md:h-16" />
+          </button>
+
+          <div className="relative max-w-5xl w-full h-full flex items-center justify-center">
+            <motion.img 
+              key={lightboxIndex}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              src={destination.images[lightboxIndex]} 
+              alt={`Gallery Full ${lightboxIndex + 1}`}
+              className="max-w-full max-h-full object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              referrerPolicy="no-referrer"
+            />
+            
+            <div className="absolute bottom-[-40px] left-0 right-0 text-center text-white/60 text-xs uppercase tracking-widest">
+              Imagem {lightboxIndex + 1} de {destination.images.length}
+            </div>
           </div>
 
           <button 
-            onClick={prevImage}
-            className="absolute left-6 text-white/50 hover:text-white transition-colors p-4 z-50"
-          >
-            <ChevronLeft className="w-12 h-12" />
-          </button>
-
-          <img 
-            src={destination.images[lightboxIndex]} 
-            alt="Gallery Fullscreen" 
-            className="max-h-[90vh] max-w-[90vw] object-contain"
-            referrerPolicy="no-referrer"
-          />
-
-          <button 
+            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-[110]"
             onClick={nextImage}
-            className="absolute right-6 text-white/50 hover:text-white transition-colors p-4 z-50"
           >
-            <ChevronRight className="w-12 h-12" />
+            <ChevronRight className="w-12 h-12 md:w-16 md:h-16" />
           </button>
         </div>
       )}
 
-      <Footer />
+      {/* Floating Notification */}
+      <AnimatePresence>
+        {showNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, x: -20 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: 20, x: -20 }}
+            className="fixed bottom-6 left-6 z-50 bg-white border border-ink/10 shadow-lg rounded-lg p-4 flex items-center gap-3 max-w-sm"
+          >
+            <div className="bg-ink/5 p-2 rounded-full">
+              <Eye className="w-5 h-5 text-ink" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Alguém de {notificationData.city}</p>
+              <p className="text-xs opacity-60">{notificationData.action}</p>
+            </div>
+            <button 
+              onClick={() => setShowNotification(false)}
+              className="absolute top-2 right-2 opacity-40 hover:opacity-100 transition-opacity"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
